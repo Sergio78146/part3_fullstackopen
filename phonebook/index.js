@@ -3,6 +3,7 @@ const morgan = require("morgan");
 const cors = require('cors');
 const app = express();
 
+const PORT = process.env.PORT || 3001;
 
 // Middleware para analizar cuerpos de solicitudes JSON
 app.use(express.json());
@@ -146,7 +147,6 @@ app.put('/api/persons/:id', (request, response) => {
   response.json(updatedPerson);
 });
 
-const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
