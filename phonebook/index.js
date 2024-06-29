@@ -1,10 +1,10 @@
 const express = require('express');
+const app = express();
 const morgan = require('morgan');
 const cors = require('cors');
-const Person = require('./mongo'); // Importar el modelo Person desde mongo.js
+const Person = require('./models/people');
 require('dotenv').config();
 
-const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -13,9 +13,19 @@ app.use(express.json());
 app.use(express.static('dist'));
 app.use(morgan('dev'));
 
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message)
+
+  if (error.name === 'CastError') {
+    return response.status(400).send({ error: 'malformatted id' })
+  }
+
+  next(error)
+}
+
 // Routes definition
 // Get all persons
-app.get('/api/persons', (req, res, next) => {
+app.get('/api/people', (req, res, next) => {
   Person.find({})
     .then(persons => {
       res.json(persons);
@@ -24,7 +34,7 @@ app.get('/api/persons', (req, res, next) => {
 });
 
 // Get a person by ID
-app.get('/api/persons/:id', (req, res, next) => {
+app.get('/api/people/:id', (req, res, next) => {
   const id = req.params.id;
   Person.findById(id)
     .then(person => {
@@ -38,7 +48,7 @@ app.get('/api/persons/:id', (req, res, next) => {
 });
 
 // Add a new person
-app.post('/api/persons', (req, res, next) => {
+app.post('/api/people', (req, res, next) => {
   const body = req.body;
 
   if (!body.name || !body.number) {
@@ -60,46 +70,38 @@ app.post('/api/persons', (req, res, next) => {
 });
 
 // Update a person
-app.put('/api/persons/:id', (req, res, next) => {
-  const id = req.params.id;
-  const body = req.body;
+app.put('/api/people/:id', (req, res, next) => {
+  const { id } = req.params;
+  const { name, number } = req.body;
 
   const person = {
-    name: body.name,
-    number: body.number,
+    name,
+    number,
   };
 
-  Person.findByIdAndUpdate(id, person, { new: true })
+  Person.findByIdAndUpdate(id, person, { new: true, runValidators: true, context: 'query' })
     .then(updatedPerson => {
-      res.json(updatedPerson);
+      if (updatedPerson) {
+        res.json(updatedPerson);
+      } else {
+        res.status(404).send({ error: 'Person not found' });
+      }
     })
     .catch(error => next(error));
 });
 
 // Delete a person
-app.delete('/api/persons/:id', (req, res, next) => {
+app.delete('/api/people/:id', (req, res, next) => {
   const id = req.params.id;
 
-  Person.findByIdAndRemove(id)
+  Person.findByIdAndDelete(id)
     .then(() => {
       res.status(204).end();
     })
     .catch(error => next(error));
 });
 
-// Error handling middleware
-const errorHandler = (error, req, res, next) => {
-  console.error(error.message);
-
-  if (error.name === 'CastError') {
-    return res.status(400).send({ error: 'Malformed ID' });
-  } else if (error.name === 'ValidationError') {
-    return res.status(400).json({ error: error.message });
-  }
-
-  next(error);
-};
-
+// Usar el middleware de manejo de errores
 app.use(errorHandler);
 
 // Start server
